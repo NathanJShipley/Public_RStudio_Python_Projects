@@ -1291,7 +1291,7 @@ final_dat_3 <- bind_cols(selected_data, component_scores)
 # Also lets go ahead and do the split into test and training data now
 # Do this based on the most recent games week and year, identified in the top of the data set 
 
-train_dat <- final_dat_3 %>% filter((year != most_recent_AP_vote_year) | (year == most_recent_AP_vote_year & week <= most_recent_AP_vote_week))
+train_dat <- final_dat_3 %>% filter((year != most_recent_AP_vote_year) | (year == most_recent_AP_vote_year & week < most_recent_AP_vote_week))
 test_dat <- final_dat_3 %>% filter(year == most_recent_AP_vote_year & week == most_recent_AP_vote_week)
 
 ##########################################################################################################################
