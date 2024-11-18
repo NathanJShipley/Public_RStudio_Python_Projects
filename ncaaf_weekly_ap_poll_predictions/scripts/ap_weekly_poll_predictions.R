@@ -306,6 +306,13 @@ bye_cross_join_dat_joined <- bye_cross_join_dat %>%
 
 joined_data_cross_joined <- bye_cross_join_dat_joined %>% dplyr::left_join(joined_data, by = c("pos_team","year","week","conference"))
 
+
+# NEW CHANGE
+# Lets make sure to maintain the win and loss flag for teams that did not play
+joined_data_cross_joined$win_flag <- ifelse(is.na(joined_data_cross_joined$win_flag),0,joined_data_cross_joined$win_flag)
+joined_data_cross_joined$loss_flag <- ifelse(is.na(joined_data_cross_joined$loss_flag),0,joined_data_cross_joined$loss_flag)
+
+
 ########################## LASTLY, make sure to do some cumulative sum calculations 
 # One major issue here is NA values perpetuating into the cumulative sums, so we might need to handle that
 
@@ -1000,6 +1007,12 @@ joined_data_with_cumulative_data_opponent_dat <- joined_data_with_cumulative_dat
   )
 
 
+# Add this step too since win and loss matter so much
+joined_data_with_cumulative_data_opponent_dat$weighted_win_flag <- ifelse(is.na(joined_data_with_cumulative_data_opponent_dat$weighted_win_flag),0,joined_data_with_cumulative_data_opponent_dat$weighted_win_flag)
+joined_data_with_cumulative_data_opponent_dat$weighted_loss_flag <- ifelse(is.na(joined_data_with_cumulative_data_opponent_dat$weighted_loss_flag),0,joined_data_with_cumulative_data_opponent_dat$weighted_loss_flag)
+
+
+
 joined_data_with_cumulative_data_opponent_datcumavg <- joined_data_with_cumulative_data_opponent_dat %>%
   arrange(pos_team,year,week) %>%
   group_by(pos_team,year) %>%
@@ -1173,6 +1186,11 @@ ap_weighted_dat <- laggedjoined_data_poll_FBS_filter_joined_lagged %>%
     
   )
 
+# New section for this
+ap_weighted_dat$ap_weighted_win_flag <- ifelse(is.na(ap_weighted_dat$ap_weighted_win_flag),0,ap_weighted_dat$ap_weighted_win_flag)
+ap_weighted_dat$ap_weighted_loss_flag <- ifelse(is.na(ap_weighted_dat$ap_weighted_loss_flag),0,ap_weighted_dat$ap_weighted_loss_flag)
+
+
 cumulative_ap_weighted_dat <- ap_weighted_dat %>%
   arrange(pos_team,year,week) %>%
   group_by(pos_team,year) %>%
@@ -1233,6 +1251,35 @@ cumulative_ap_weighted_dat <- ap_weighted_dat %>%
   ungroup()
 
 
+
+################# New final step, lag the win and loss variables
+final_data_for_analyze <- cumulative_ap_weighted_dat %>% 
+  arrange(pos_team,year,week) %>%
+  group_by(pos_team,year) %>%
+  mutate(lagged_win_flag = dplyr::lag(win_flag),
+         lagged_points = ifelse(is.na(lagged_points), 0, lagged_points),
+         
+         lagged_loss_flag = dplyr::lag(loss_flag),
+         lagged_loss_flag = ifelse(is.na(lagged_loss_flag), 0, lagged_loss_flag),
+         
+         lagged_weighted_win_flag = dplyr::lag(weighted_win_flag),
+         lagged_weighted_win_flag = ifelse(is.na(lagged_weighted_win_flag), 0, lagged_weighted_win_flag),
+           
+         lagged_weighted_loss_flag = dplyr::lag(weighted_loss_flag),     
+         lagged_weighted_loss_flag = ifelse(is.na(lagged_weighted_loss_flag), 0, lagged_weighted_loss_flag),
+           
+         lagged_ap_weighted_win_flag = dplyr::lag(ap_weighted_win_flag),    
+         lagged_ap_weighted_win_flag = ifelse(is.na(lagged_ap_weighted_win_flag), 0, lagged_ap_weighted_win_flag),
+           
+         lagged_ap_weighted_loss_flag = dplyr::lag(ap_weighted_loss_flag),         
+         lagged_ap_weighted_loss_flag = ifelse(is.na(lagged_ap_weighted_loss_flag), 0, lagged_ap_weighted_loss_flag),
+           
+  ) %>%
+  ungroup()
+
+
+
+
 ########################################################################################################################
 
 
@@ -1241,7 +1288,7 @@ cumulative_ap_weighted_dat <- ap_weighted_dat %>%
 #=========================================== =
 ##########################################################################################################################
 # Lets first set a baseline for the main data
-analyze_dat <- cumulative_ap_weighted_dat
+analyze_dat <- final_data_for_analyze
 
 ########################################################### # #  # # # Remove missing data (extreme cases)
 # Drop variables where more than 20% are missing 
@@ -1276,11 +1323,19 @@ selected_data <- cleaned_analyze_dat %>% select(c(pos_team, week, year, log_vote
                                                   ,cumulative_allowed_total_pass_inccompletes,cumulative_avg_per_game_allowed_avg_passing_yards_per_attempt
                                               ,cumulative_w_weighted_avg_weighted_allowed_total_passing_yards,cumulative_avg_per_game_allowed_total_passing_touchdowns
                                               ,cumulative_allowed_avg_yards_per_play,cumulative_avg_per_game_fourth_down_efficicency
-                                              ,w_weighted_cumulative_game_win_efficiency, w_weighted_cumulative_games_won, w_weighted_avg_weighted_points_scored
+                                              ,w_weighted_cumulative_game_win_efficiency, w_weighted_cumulative_games_won, w_weighted_avg_weighted_points_scored, w_weighted_cumulative_games_lost,
                                               ,w_weighted_weighted_win_flag_opponent, w_weighted_cumulative_avg_points_allowed_per_game,cumulative_redzone_scoring_efficiency
                                               ,cumulative_w_weighted_avg_weighted_allowed_total_pass_completes,cumulative_game_win_efficiency, cumulative_ap_weighted_allowed_total_yards
-                                              ,cumulative_ap_weighted_loss_flag,cumulative_ap_weighted_total_yards, cumulative_ap_weighted_point_dif_per_game_avg
-
+                                              ,cumulative_ap_weighted_loss_flag,cumulative_ap_weighted_total_yards, cumulative_ap_weighted_point_dif_per_game_avg, 
+                                              
+                                              # New variables since last tuning of hyperparms
+                                              cumulative_point_dif, cumulative_point_dif_avg_per_game, cumulative_ap_weighted_point_dif, cumulative_ap_weighted_loss_flag_per_game_avg
+                                              ,w_weighted_cumulative_games_lost, 
+                                              
+                                              # These need to be lagged
+                                              #win_flag, loss_flag, weighted_win_flag, weighted_loss_flag, ap_weighted_win_flag, ap_weighted_loss_flag
+                                              
+                                              lagged_win_flag, lagged_loss_flag, lagged_weighted_win_flag, lagged_weighted_loss_flag, lagged_ap_weighted_win_flag,lagged_ap_weighted_loss_flag
 ))
 
 final_dat_3 <- bind_cols(selected_data, component_scores)
