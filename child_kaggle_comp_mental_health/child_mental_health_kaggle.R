@@ -1,5 +1,5 @@
 #==============================================================================
-#                              AP Vote Prediction Analysis                   #      
+#                              Child Kaggle Mental Health                  #      
 #==============================================================================
 
 # Final model got a .299 which was a pretty low score, but got really bored with this one. Really digs more into missing data than anything else. Not that interested
