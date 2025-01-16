@@ -21,12 +21,17 @@ library(viridis)
 # Read in the data
 dat <- read.csv("spotify_data.csv")
 
-dat <- dat %>% 
-          filter(year >= 2014 & (artist !="Pink Noise" | is.na(artist)) ) %>% # all my data from 2014 is pretty sparse and remove the whitenoise app I used to sleep
-          filter(ms_played != 0) %>% #lets just drop these 
-          arrange(ts) %>% # arrange in order to then drop duplicate date times
-          distinct(ts, .keep_all = TRUE)
+dat <- dat %>%
+  filter(
+    year >= 2014,                                  # Keep data from 2014 onwards
+    (artist != "Pink Noise" | is.na(artist)),      # Exclude "Pink Noise" or keep if artist is NA
+    year <= year(Sys.Date()) - 1                   # Only include data up to the previous year
+  ) %>%
+  filter(ms_played != 0) %>%                       # Remove rows with zero playback time
+  arrange(ts) %>%                                  # Arrange by timestamp
+  distinct(ts, .keep_all = TRUE)                  # Remove duplicate timestamps
   
+
 dat$ts <- lubridate::ymd_hms(dat$ts, tz = "UTC")
 
 dat$day <- lubridate::yday(dat$ts)

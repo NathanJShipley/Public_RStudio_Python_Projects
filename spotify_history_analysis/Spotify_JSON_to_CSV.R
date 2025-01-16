@@ -43,3 +43,4 @@ dat$mins <- dat$seconds / 60
 
 # Okay, I think I have most of the data that I want
 write.csv(dat,"spotify_data.csv")
+
