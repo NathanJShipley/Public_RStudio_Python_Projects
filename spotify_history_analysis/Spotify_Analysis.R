@@ -11,7 +11,8 @@ library(tidytext)
 library(randomcoloR)
 library(RColorBrewer)
 library(viridis)
-
+library(gganimate)
+library(plotly)
 
 
 #===========================================
@@ -35,6 +36,10 @@ dat <- dat %>%
 dat$ts <- lubridate::ymd_hms(dat$ts, tz = "UTC")
 
 dat$day <- lubridate::yday(dat$ts)
+
+dat$hours <- dat$ms_played / (1000 * 60 * 60)
+
+
 
 #===========================================
 # Visualize some data                      #
@@ -724,5 +729,114 @@ ggplot(top_1_artists_per_month_year, aes(x = factor(month), y = total_played_hou
   ) +
   facet_wrap(~ year, scales = "free_y")  # Separate plots for each year
 
+#=================================================================================================================== 
+#===================================================================================================================
+#=================================================================================================================== 
 
+# Step 1, top 10 artists over time
+top_10_artists_all_time <- dat %>%
+  filter(type == "song" & year >= 2018) %>%
+  group_by(artist) %>%
+  summarise(seconds = sum(seconds),
+            minutes = seconds/60,
+            hours = minutes/60
+  ) %>%
+  slice_max(order_by = hours, n = 10)
+
+
+# Step 2, semi join to just select the data for top 10 artists 
+top_artists_alltime_data <- dat %>%
+  filter(type == "song" & year >= 2018) %>%
+  semi_join(top_10_artists_all_time, by = c("artist"))
+
+
+# Step 3, do calculations for 
+monthly_hours_top_10_artists_cumu <- top_artists_alltime_data %>%
+  group_by(month_year, artist) %>%
+  summarise(
+    total_monthly_seconds = sum(seconds),
+    total_monthly_hours = total_monthly_seconds / 3600,
+    .groups = "drop"
+  ) %>%
+  group_by(artist)%>%
+  arrange(artist, month_year) %>%
+  reframe(month_year = month_year,
+          cum_total_hours = cumsum(total_monthly_hours))
+
+
+# Plot the total hours per month, color-coded by year with similar colors
+cumulative_sum_10_artists_plot <- ggplot(
+  monthly_hours_top_10_artists_cumu, 
+  aes(x = as.Date(month_year), y = cum_total_hours, color = artist, group = artist)
+) +
+  geom_line(linewidth = 1.2) +
+  labs(
+    title = "Cumulative Listening Hours Over Time",
+    x = "Month-Year",
+    y = "Cumulative Hours",
+    color = "Artist"
+  ) +
+  scale_color_viridis(discrete = TRUE) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "3 months") +  # Adjust date format and breaks
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    axis.title = element_text(size = 14, face = "bold"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+  )
+
+cumulative_sum_10_artists_plot
+
+
+# Convert to an interactive plotly chart
+interactive_plot_top_10 <- plotly::ggplotly(cumulative_sum_10_artists_plot)
+
+
+# Display the interactive plot
+interactive_plot_top_10
+
+
+
+# Create the animated plot with lines progressively growing over time
+cumulative_sum_10_artists_plot_animated <- ggplot(
+  monthly_hours_top_10_artists_cumu, 
+  aes(x = as.Date(month_year), y = cum_total_hours, color = artist, group = artist)
+) +
+  geom_line(linewidth = 1.2) +
+  geom_segment(aes(xend = max(as.Date(month_year)), yend = cum_total_hours), 
+               linetype = 2, colour = 'blue') +
+  geom_point(size = 3) + 
+  geom_text(aes(x = max(as.Date(month_year)) + 0.1, label = sprintf("%5.0f", cum_total_hours)), 
+            hjust = 0) +
+  transition_reveal(as.Date(month_year)) +  # Animation over time
+  view_follow(fixed_y = TRUE) +  # Fix y-axis to show all data
+  coord_cartesian(clip = 'off') +  # Ensure the text is visible outside plot area
+  labs(title = 'Cumulative Listening Hours Over Time', y = 'Cumulative Hours') +
+  enter_drift(x_mod = -1) + exit_drift(x_mod = 1) +
+  theme_bw() +
+  theme(
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(colour = "black"),
+    plot.margin = margin(5.5, 40, 5.5, 5.5)
+  ) +
+  scale_color_viridis(discrete = TRUE) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "3 months") +  # Adjust date format and breaks
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(size = 14, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 14),
+    axis.title = element_text(size = 16, face = "bold"),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5)
+  )
+
+# View the plot animation
+cumulative_sum_10_artists_plot_animated
+
+# Create the animation and save it as a GIF
+animate(cumulative_sum_10_artists_plot_animated, 
+        width = 1600, height = 1200, fps = 30, duration = 15, 
+        renderer = gifski_renderer("top_artists_race.gif"))
 
